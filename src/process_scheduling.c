@@ -47,6 +47,9 @@ bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quan
 	return false;
 }
 
+/// @brief Reads the PCB values from the binary file into ProcessControlBlock_t for N number of PCB entries stored in the file
+/// @param input_file the file containing the PCB burst times
+/// @return a populated dyn_array of ProcessControlBlocks if function ran successful else NULL for an error
 dyn_array_t *load_process_control_blocks(const char *input_file) 
 {
 	UNUSED(input_file);
