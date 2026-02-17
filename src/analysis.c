@@ -31,23 +31,23 @@ int main(int argc, char **argv)
 	// if else for the names of the algorithms 
 
 	const char *algorithm = argv[2];
-	const char *algorithmLen = strnlen(algorithm, 4);
+	size_t  algorithmLen = strnlen(algorithm, 5);
 	bool completed = false;
-	size_t quant = NULL;
-	
+	size_t quant = 0;
+	ScheduleResult_t result;
 
-	if(strncmp(algorithm , P, 1 && algorithmLen == 1) == 0 ){
-		completed = Priority(pcb, NULL);
+	if(strncmp(algorithm , P, 1) && algorithmLen == 1 == 0 ){
+		completed = priority(pcb, &result);
 	}else if(strncmp(algorithm, RR, 2) == 0 && algorithmLen == 2){
 		char extra;
 		if(sscanf(argv[3], "%zu%c", &quant, &extra) != 1) return EXIT_FAILURE;
-		completed = round_robin(pcb , NULL, quant);
+		completed = round_robin(pcb , &result, quant);
 	}else if(strncmp(algorithm, SJF, 3) == 0 && algorithmLen == 3){
-		completed = shortest_job_first(pcb, NULL);
+		completed = shortest_job_first(pcb, &result);
 	}else if(strncmp(algorithm, SRT, 3) == 0 && algorithmLen == 3){
-		completed = shortest_remaining_time_first(pcb, NULL);
+		completed = shortest_remaining_time_first(pcb, &result);
 	}else if(strncmp(algorithm, FCFS, 4) == 0 && algorithmLen == 4){
-		completed = first_come_first_serve(pcb, NULL);
+		completed = first_come_first_serve(pcb, &result);
 	}else{
 		fprintf(stderr, "Unknown scheduling algorithm: %s\n", algorithm);
     	return EXIT_FAILURE;
@@ -57,6 +57,13 @@ int main(int argc, char **argv)
 
 	//abort();		// REPLACE ME with implementation.
 
-	if(completed) return EXIT_SUCCESS;
+	if(completed){
+		printf("Average waiting time: %.2f\n", result.average_waiting_time);
+   	 	printf("Average turnaround time: %.2f\n", result.average_turnaround_time);
+   	 	printf("Total run time: %lu\n", result.total_run_time);
+
+		 return EXIT_SUCCESS;
+	}
+	
 	return EXIT_FAILURE;
 }
