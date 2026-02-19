@@ -35,6 +35,22 @@ class GradeEnvironment : public testing::Environment
 };
 */
 
+TEST(FCFSTest, HandleEmptyQueue) {
+	dyn_array_t test_queue = dyn_array_create(0, sizeof(ProcessControlBlock_t), NULL);
+	ScheduleResult_t result{};
+	bool success = first_come_first_serve(test_queue);
+
+	EXPECT_FALSE(success);
+
+	dyn_array_destroy(test_queue);
+}
+
+TEST(LoadPCBTest, HandleNullFile) {
+	bool success = load_process_control_blocks(nullptr);
+
+	EXPECT_EQ(success, NULL);
+}
+
 
 int main(int argc, char **argv)
 {

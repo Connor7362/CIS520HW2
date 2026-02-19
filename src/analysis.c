@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "dyn_array.h"
 #include "processing_scheduling.h"
