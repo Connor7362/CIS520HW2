@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 	size_t quant = 0;
 	ScheduleResult_t result;
 
-	if(strncmp(algorithm , P, 1) && algorithmLen == 1 == 0 ){
+	if((strncmp(algorithm , P, 1) && algorithmLen == 1) || (strncmp(algorithm, P, 1) && algorithmLen == 0)){
 		completed = priority(pcb, &result);
 	}else if(strncmp(algorithm, RR, 2) == 0 && algorithmLen == 2){
 		char extra;
