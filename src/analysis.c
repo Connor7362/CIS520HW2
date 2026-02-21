@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 
 	// get a dyn array from the pcb file using load proccess control blcok function
 	dyn_array_t* pcb = load_process_control_blocks(argv[1]);
-
+	if(pcb == NULL) return EXIT_FAILURE;
 	 
 	// if else for the names of the algorithms 
 

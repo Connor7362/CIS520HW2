@@ -85,20 +85,88 @@ bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quan
 dyn_array_t *load_process_control_blocks(const char *input_file) 
 {
 	if (input_file == NULL) return NULL;
+	if(*input_file == '\n' || *input_file == '\0') return NULL;
 
 	int fd = open(input_file, O_RDONLY);
 	if (fd == -1) return NULL;
 
-	ProcessControlBlock_t *pcb; // the file is containing PCBs
+	size_t totalRead = 0; //total amount of bytes read so far
+	uint32_t n; // the number of PCB structs needed to read in
+	while (totalRead < sizeof(uint32_t)) {
+		ssize_t readIn = read(fd, ((uint8_t*)&n) + totalRead, sizeof(uint32_t) - totalRead);
+		if (readIn <= 0) { close(fd); return NULL; }
+		totalRead += (size_t)readIn; 
+	}
+	//                                          0 minimum cappacity , sizeof(struct) , no destructor
+	dyn_array_t* dynamicArray = dyn_array_create(0 , sizeof(ProcessControlBlock_t), NULL);
+	if(!dynamicArray) return NULL;
+
+	//bool dyn_array_push_front(dyn_array_t *const dyn_array, const void *const object);
+	size_t sectionNum = 0;
+
+	uint32_t burstTime;
+	uint32_t priority;
+	uint32_t arrivalTime;
+
+	uint32_t data;
+	size_t readBytes = 0;
+
+	totalRead = 0;
+	size_t totalBytes = 3 * n;
+	while(totalRead < totalBytes){
+
+		ssize_t readIn = read(fd, ((uint8_t*)&data) + readBytes, sizeof(uint32_t) - readBytes);
+		if (readIn <= 0) { close(fd); return NULL; }
+		readBytes += (size_t)readIn; 
+
+		if(readBytes == 4){
+			switch(sectionNum)
+			{
+				case 0:
+					burstTime = data;
+					break;
+				case 1:
+					priority = data;
+					break;
+				case 2: 
+					arrivalTime = data;
+					break;
+				default:
+					return NULL;
+			}
+			readBytes = 0;
+			sectionNum++;
+			totalRead ++;
+		}
+
+		if(sectionNum == 3){
+			ProcessControlBlock_t pcb;
+			pcb.remaining_burst_time = burstTime;
+			pcb.priority = priority;
+			pcb.arrival = arrivalTime;
+			pcb.started = false;
+			sectionNum = 0;
+
+			if(!dyn_array_push_back(dynamicArray , &pcb)) return NULL;
+		}
+
+
+	}
+
+	//ProcessControlBlock_t *pcb; // the file is containing PCBs
+
+	
+
 
 	close(fd);
 	// UNUSED(input_file);
 	// return NULL;
+	return dynamicArray;
 }
 
 bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
 	UNUSED(ready_queue);
 	UNUSED(result);
-	return false;
+	return NULL;
 }
