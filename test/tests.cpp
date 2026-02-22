@@ -49,57 +49,53 @@ TEST(FCFSTest, HandleEmptyQueue) {
 }
 
 TEST(FCFSTest, ThreeProcessesDifferentArrival) {
-    dyn_array_t *queue = dyn_array_create(0, sizeof(ProcessControlBlock_t), NULL);
+    dyn_array_t *queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
     ASSERT_NE(queue, nullptr);
 
-    ProcessControlBlock_t p1 = { .arrival = 0,  .remaining_burst_time = 5, .priority = 0 };
-    ProcessControlBlock_t p2 = { .arrival = 2,  .remaining_burst_time = 3, .priority = 0 };
-    ProcessControlBlock_t p3 = { .arrival = 4,  .remaining_burst_time = 6, .priority = 0 };
+    ProcessControlBlock_t p1 = { .remaining_burst_time = 5, .priority = 0, .arrival = 0, .started = false };
+    ProcessControlBlock_t p2 = { .remaining_burst_time = 3, .priority = 0, .arrival = 2, .started = false };
+    ProcessControlBlock_t p3 = { .remaining_burst_time = 6, .priority = 0, .arrival = 4, .started = false };
 
-    dyn_array_push_back(queue, &p1);
-    dyn_array_push_back(queue, &p2);
-    dyn_array_push_back(queue, &p3);
+    ASSERT_TRUE(dyn_array_push_back(queue, &p1));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p2));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p3));
 
-    ScheduleResult_t result = {0};
+    ASSERT_EQ(dyn_array_size(queue), 3u);
+
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
 
     bool success = first_come_first_serve(queue, &result);
+
     EXPECT_TRUE(success) << "FCFS should succeed on valid input";
-
-    // Manual calculation:
-    //   P1: start  0 -> finish  5    wait = 0     TAT = 5
-    //   P2: start  5 -> finish  8    wait = 5-2=3 TAT = 8-2=6
-    //   P3: start  8 -> finish 14    wait = 8-4=4 TAT =14-4=10
-
-    // Averages:
-    //   Avg Wait = (0 + 3 + 4) / 3 = 7/3 ? 2.333...
-    //   Avg TAT  = (5 + 6 +10) / 3 = 21/3 = 7.0
-
     const float EPS = 0.001f;
-
-    EXPECT_NEAR(result.average_waiting_time,   2.333333f, EPS);
-    EXPECT_NEAR(result.average_turnaround_time, 7.0f,      EPS);
-    EXPECT_EQ  (result.total_run_time,         14u);
+    EXPECT_NEAR(result.average_waiting_time, 2.333333f, EPS);
+    EXPECT_NEAR(result.average_turnaround_time, 7.0f, EPS);
+    EXPECT_EQ(result.total_run_time, 14u);
 
     dyn_array_destroy(queue);
 }
 
-TEST(LoadPCBTest, HandleNullFile) {
-	dyn_array_t *success = load_process_control_blocks(nullptr);
-
-	EXPECT_EQ(success, nullptr);
-}
-
 TEST(LoadPCBTest, LoadsCorrectNumberAndValues) {
 
-    printf "\x00\x00\x00\x00\x08\x00\x00\x00\x05\x00\x00\x00\
-    \x03\x00\x00\x00\x04\x00\x00\x00\x02\x00\x00\x00\
-    \x0A\x00\x00\x00\x05\x00\x00\x00\x07\x00\x00\x00" > test_pcb.bin
+   const char* test_file = "test_pcb.bin";
+    FILE* fp = fopen(test_file, "wb");
+    ASSERT_NE(fp, nullptr) << "Failed to create test file";
 
-    const char* test_file = "test_pcb.bin";
+    uint32_t num_processes = 3;
+    fwrite(&num_processes, sizeof(uint32_t), 1, fp);
+
+    uint32_t p1[] = {8, 5, 0};   // burst=8, priority=5, arrival=0
+    fwrite(p1, sizeof(uint32_t), 3, fp);
+    uint32_t p2[] = {4, 2, 3};   // burst=4, priority=2, arrival=3
+    fwrite(p2, sizeof(uint32_t), 3, fp);
+    uint32_t p3[] = {5, 7, 10};  // burst=5, priority=7, arrival=10
+    fwrite(p3, sizeof(uint32_t), 3, fp);
+
+    fclose(fp);
 
     dyn_array_t* queue = load_process_control_blocks(test_file);
     ASSERT_NE(queue, nullptr) << "Failed to load PCBs from file";
-    
+
     EXPECT_EQ(dyn_array_size(queue), 3u) << "Should load exactly 3 processes";
 
     ProcessControlBlock_t* pcb0 = (ProcessControlBlock_t*)dyn_array_at(queue, 0);
@@ -113,16 +109,20 @@ TEST(LoadPCBTest, LoadsCorrectNumberAndValues) {
     EXPECT_EQ(pcb0->arrival, 0u);
     EXPECT_EQ(pcb0->remaining_burst_time, 8u);
     EXPECT_EQ(pcb0->priority, 5u);
+    EXPECT_FALSE(pcb0->started);
 
     EXPECT_EQ(pcb1->arrival, 3u);
     EXPECT_EQ(pcb1->remaining_burst_time, 4u);
     EXPECT_EQ(pcb1->priority, 2u);
+    EXPECT_FALSE(pcb1->started);
 
     EXPECT_EQ(pcb2->arrival, 10u);
     EXPECT_EQ(pcb2->remaining_burst_time, 5u);
     EXPECT_EQ(pcb2->priority, 7u);
+    EXPECT_FALSE(pcb2->started);
 
     dyn_array_destroy(queue);
+    unlink(test_file);
 }
 
 

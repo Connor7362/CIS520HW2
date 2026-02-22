@@ -24,7 +24,7 @@ bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result)
 {
 	if (ready_queue == NULL || result == NULL) return false;
 
-	size_t processes = dyn_array_data_size(ready_queue);
+	size_t processes = dyn_array_size(ready_queue);
 	if (processes == 0) {
 		result->average_waiting_time = 0;
 		result->average_turnaround_time = 0;
@@ -35,6 +35,7 @@ bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result)
 	float cur_time = 0;
 	float total_waiting_time = 0; 
 	float total_turnaround_time = 0;
+	unsigned long total_run_time = 0;
 
 	for (size_t i = 0; i < processes; i++) {
 		ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, i); // puts process i at pcb
@@ -51,11 +52,15 @@ bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result)
 		// we calculate averages outside the for loop
 		total_waiting_time += waiting_time;
 		total_turnaround_time += turnaround_time;
+
+		total_run_time = completion_time; // should be last completion_time
+
+		cur_time = completion_time; // needed to update cur_time to completion_time after each loop
 	}
 
 	result->average_waiting_time = total_waiting_time / processes;
 	result->average_turnaround_time = total_turnaround_time / processes;
-	result->total_run_time = (unsigned long)total_turnaround_time;
+	result->total_run_time = total_run_time;
 	
 	return true;
 }
