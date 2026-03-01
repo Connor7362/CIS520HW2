@@ -246,7 +246,45 @@ TEST(SRTF, CorrectResultValues){
 
 }
 
+TEST(SJF, CheckEmptyQueue) {
+    dyn_array_t *test_queue = dyn_array_create(0, sizeof(ProcessControlBlock_t), NULL);
+	ScheduleResult_t* result{};
+	bool success = shortest_job_first(test_queue, result);
 
+	EXPECT_FALSE(success);
+
+	dyn_array_destroy(test_queue);
+}
+
+TEST(SJF, CorrectResultValues) {
+    dyn_array_t *test_queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
+    ASSERT_NE(test_queue, nullptr);
+
+    ProcessControlBlock_t p1 = { .remaining_burst_time = 6, .priority = 0, .arrival = 2, .started = false };
+    ProcessControlBlock_t p2 = { .remaining_burst_time = 2, .priority = 0, .arrival = 5, .started = false };
+    ProcessControlBlock_t p3 = { .remaining_burst_time = 8, .priority = 0, .arrival = 1, .started = false };
+    ProcessControlBlock_t p4 = { .remaining_burst_time = 3, .priority = 0, .arrival = 0, .started = false };
+    ProcessControlBlock_t p5 = { .remaining_burst_time = 4, .priority = 0, .arrival = 4, .started = false };
+    ASSERT_TRUE(dyn_array_push_back(test_queue, &p1));
+    ASSERT_TRUE(dyn_array_push_back(test_queue, &p2));
+    ASSERT_TRUE(dyn_array_push_back(test_queue, &p3));
+    ASSERT_TRUE(dyn_array_push_back(test_queue, &p4));
+    ASSERT_TRUE(dyn_array_push_back(test_queue, &p5));
+
+    ASSERT_EQ(dyn_array_size(test_queue), 5u);
+
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
+
+    bool success = shortest_job_first(test_queue, &result);
+
+    ASSERT_TRUE(success);
+
+    EXPECT_EQ(result.average_waiting_time,               (float)5.2);
+    EXPECT_EQ(result.average_turnaround_time,            (float)9.8);
+    EXPECT_EQ(result.total_run_time,                     (unsigned long)23);
+
+    dyn_array_destroy(test_queue);
+}
 
 
 int main(int argc, char **argv)

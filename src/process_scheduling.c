@@ -65,11 +65,78 @@ bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result)
 	return true;
 }
 
+//https://www.geeksforgeeks.org/dsa/program-for-shortest-job-first-or-sjf-cpu-scheduling-set-1-non-preemptive/
+/// @brief Non-preimptive sjf that starts the process with the fastest time.
+/// @param ready_queue dyn_array of processcontrolblock_t
+/// @param result stat tracking
+/// @return true if succeeded, otherwise false
 bool shortest_job_first(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
-	UNUSED(ready_queue);
-	UNUSED(result);
-	return false;
+	if (ready_queue == NULL || result == NULL) return false;
+	if (dyn_array_empty(ready_queue)) return false;
+
+	size_t processes = dyn_array_size(ready_queue);
+
+	float cur_time = 0;
+    float total_waiting_time = 0;
+    float total_turnaround_time = 0;
+    unsigned long total_run_time = 0;
+
+	// bool ptr to keep track of the processes that complete
+	bool *done = (bool*)malloc(sizeof(processes));
+	for (size_t i = 0; i < processes; i++) { // initially false
+		*(done + i) = false;
+	}
+
+	// for the while loop to see if we finished them all
+	size_t finished_processes = 0;
+
+	while (finished_processes < processes) {
+		uint32_t shortest_burst = UINT32_MAX;
+		int shortest_index = -1;
+
+		for (size_t i = 0; i < processes; i++) {
+			if (*(done + i)) continue; // if process is done it skips to next iteration
+
+			ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, i);
+
+			// helps with cpu idle
+			if (pcb->arrival <= cur_time && pcb->remaining_burst_time < shortest_burst) {
+				shortest_burst = pcb->remaining_burst_time;
+				shortest_index = i;
+			}
+		}
+
+		// there were no arrival times at cur_time
+		if (shortest_index == -1) {
+			cur_time++;
+			continue;
+		}
+
+		ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, shortest_index);
+
+		// calculations from geekforgeeks
+		float waiting_time = cur_time - pcb->arrival;
+        float completion_time = cur_time + pcb->remaining_burst_time;
+        float turnaround_time = completion_time - pcb->arrival;
+
+        total_waiting_time += waiting_time;
+        total_turnaround_time += turnaround_time;
+
+        cur_time = completion_time;
+        total_run_time = completion_time;
+
+		// most recent shortest_index updated to completed, so it skips in the for loop
+        *(done + shortest_index) = true;
+        finished_processes++;
+	}
+
+	// finds our avgs
+	result->average_waiting_time = total_waiting_time / processes;
+	result->average_turnaround_time = total_turnaround_time / processes;
+	result->total_run_time = total_run_time;
+
+	return true;
 }
 
 bool priority(dyn_array_t *ready_queue, ScheduleResult_t *result) 
