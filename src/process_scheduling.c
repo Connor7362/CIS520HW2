@@ -84,8 +84,9 @@ bool shortest_job_first(dyn_array_t *ready_queue, ScheduleResult_t *result)
 
 	// bool ptr to keep track of the processes that complete
 	bool *done = (bool*)malloc(sizeof(processes));
-	for (size_t i = 0; i < processes; i++) { // initially false
-		*(done + i) = false;
+	if (done == NULL) return false;
+	for (size_t i = 0; i < processes; i++) {
+		*(done + i) = false; // initially false
 	}
 
 	// for the while loop to see if we finished them all
