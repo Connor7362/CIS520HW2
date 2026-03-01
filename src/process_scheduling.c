@@ -169,9 +169,141 @@ dyn_array_t *load_process_control_blocks(const char *input_file)
 	return dynamicArray;
 }
 
+// Runs the preemptive Shortest Remaining Time First Process Scheduling algorithm over the incoming ready_queue
+// \param ready queue a dyn_array of type ProcessControlBlock_t that contain be up to N elements
+// \param result used for shortest job first stat tracking \ref ScheduleResult_t
+// \return true if function ran successful else false for an error
+// There is no guarantee that the passed dyn_array_t will be the result of your implementation of load_process_control_blocks
 bool shortest_remaining_time_first(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
-	UNUSED(ready_queue);
-	UNUSED(result);
-	return NULL;
+    if (!ready_queue || !result) return false;
+    if (dyn_array_empty(ready_queue)) return false;
+
+    size_t array_size = dyn_array_size(ready_queue);
+
+    // original burst and arrival times for the function
+    uint32_t *original_burst_times   = calloc(array_size, sizeof(uint32_t));
+    uint32_t *original_arrival_times = calloc(array_size, sizeof(uint32_t));
+    if (!original_burst_times || !original_arrival_times) {
+        free(original_burst_times);
+        free(original_arrival_times);
+        return false;
+    }
+
+	// set orignal values to the pcb values initally
+    for (size_t i = 0; i < array_size; i++) {
+        ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, i);
+        if (!pcb) { 
+            free(original_burst_times);
+            free(original_arrival_times);
+            return false; 
+        }
+        original_burst_times[i]   = pcb->remaining_burst_time;
+        original_arrival_times[i] = pcb->arrival;
+        pcb->started = false;
+    }
+
+    float total_waiting_time = 0.0f;
+    float total_turnaround_time = 0.0f;
+    unsigned long clock = 0;
+
+	// loops until the array is empty
+    while (!dyn_array_empty(ready_queue)) 
+    {
+        size_t curr_size = dyn_array_size(ready_queue);
+
+        // found an index with 0 arrival time
+        bool found_arrived = false;
+        size_t best_index = 0; // the index with arrival time 0 and the least burst time
+        uint32_t best_remaining = 0; // the burst time for ht ebest index
+
+		// finds the index with the lowest burst time that has arrival time = 0
+        for (size_t i = 0; i < curr_size; i++) {
+            ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, i);
+            if (!pcb) { // one of the dynamic arrays are null return false
+                free(original_burst_times);
+                free(original_arrival_times);
+                return false;
+            }
+
+            if (pcb->arrival == 0) {
+                if (!found_arrived || pcb->remaining_burst_time < best_remaining) {
+                    found_arrived = true;
+                    best_index = i;
+                    best_remaining = pcb->remaining_burst_time;
+                }
+            }
+        }
+
+        // if nothing has arrived yet, CPU is idle for 1 tick
+        if (!found_arrived) {
+            for (size_t i = 0; i < curr_size; i++) {
+                ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, i);
+                if (!pcb) {
+                    free(original_burst_times);
+                    free(original_arrival_times);
+                    return false;
+                }
+                if (pcb->arrival > 0) pcb->arrival--;
+            }
+            clock++;
+            continue; // jumps to top of the while loop
+        }
+
+        
+        ProcessControlBlock_t *curr = (ProcessControlBlock_t*)dyn_array_at(ready_queue, best_index);
+        if (!curr) {
+            free(original_burst_times);
+            free(original_arrival_times);
+            return false;
+        }
+
+        curr->started = true;
+        virtual_cpu(curr);
+        clock++;
+
+        // decrement arrival time for proccess with arrival > 0
+        for (size_t i = 0; i < curr_size; i++) {
+            ProcessControlBlock_t *pcb = (ProcessControlBlock_t*)dyn_array_at(ready_queue, i);
+            if (!pcb) {
+                free(original_burst_times);
+                free(original_arrival_times);
+                return false;
+            }
+            if (pcb->arrival > 0) pcb->arrival--;
+        }
+
+        // if the proccess has finished
+        if (curr->remaining_burst_time == 0) 
+        {
+		
+            uint32_t turnaround = (uint32_t)(clock - original_arrival_times[best_index]); // the turnaround for the proccess
+            uint32_t waiting    = turnaround - original_burst_times[best_index]; // the waiting time for the proccess 
+
+            total_turnaround_time += (float)turnaround;
+            total_waiting_time    += (float)waiting;
+
+			// erases the index of the finished proccess
+            if (!dyn_array_erase(ready_queue, best_index)) {
+                free(original_burst_times);
+                free(original_arrival_times);
+                return false;
+            }
+
+            // shifts hte original arrays since the removed pcb object is no longer in the dynamic array
+            for (size_t j = best_index; j + 1 < curr_size; j++) {
+                original_burst_times[j]   = original_burst_times[j + 1];
+                original_arrival_times[j] = original_arrival_times[j + 1];
+            }
+        }
+    }
+
+    result->average_waiting_time = total_waiting_time / (float)array_size;
+    result->average_turnaround_time = total_turnaround_time / (float)array_size;
+    result->total_run_time = clock;
+
+    free(original_burst_times);
+    free(original_arrival_times);
+    return true;
 }
+	

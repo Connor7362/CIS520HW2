@@ -205,6 +205,47 @@ TEST(LoadPCBTest, ReadsBinaryPCBFileCorrectly)
     unlink(pathTemplate); // destroys the temp file
 }
 
+TEST(SRTF, CheckEmptyQueue)
+{
+    dyn_array_t *test_queue = dyn_array_create(0, sizeof(ProcessControlBlock_t), NULL);
+	ScheduleResult_t* result{};
+	bool success = shortest_remaining_time_first(test_queue, result);
+
+	EXPECT_FALSE(success);
+
+	dyn_array_destroy(test_queue);
+}
+
+TEST(SRTF, CorrectResultValues){
+    dyn_array_t *queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
+    ASSERT_NE(queue, nullptr);
+
+    ProcessControlBlock_t p1 = { .remaining_burst_time = 15, .priority = 0, .arrival = 0, .started = false };
+    ProcessControlBlock_t p2 = { .remaining_burst_time = 10, .priority = 0, .arrival = 1, .started = false };
+    ProcessControlBlock_t p3 = { .remaining_burst_time = 5, .priority = 0, .arrival = 2, .started = false };
+    ProcessControlBlock_t p4 = { .remaining_burst_time = 20, .priority = 0, .arrival = 3, .started = false };
+    ASSERT_TRUE(dyn_array_push_back(queue, &p1));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p2));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p3));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p4));
+
+    ASSERT_EQ(dyn_array_size(queue), 4u);
+
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
+
+
+    bool success = shortest_remaining_time_first(queue, &result);
+
+    ASSERT_TRUE(success);
+
+    EXPECT_EQ(result.average_waiting_time,               (float)11.75);
+    EXPECT_EQ(result.average_turnaround_time,            (float)24.25);
+    EXPECT_EQ(result.total_run_time,                     (unsigned long)50);
+    
+    dyn_array_destroy(queue);
+
+}
+
 
 
 
