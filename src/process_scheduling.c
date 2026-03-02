@@ -8,9 +8,6 @@
 #include "processing_scheduling.h"
 
 
-// You might find this handy.  I put it around unused parameters, but you should
-// remove it before you submit. Just allows things to compile initially.
-#define UNUSED(x) (void)(x)
 
 // private function
 void virtual_cpu(ProcessControlBlock_t *process_control_block) 
@@ -21,6 +18,12 @@ void virtual_cpu(ProcessControlBlock_t *process_control_block)
 
 
 //https://www.geeksforgeeks.org/dsa/first-come-first-serve-cpu-scheduling-non-preemptive/ for help
+// Runs the First Come First Served Process Scheduling algorithm over the incoming ready_queue
+// \param ready queue a dyn_array of type ProcessControlBlock_t
+// that contain be up to N elements
+// \param result used for first come first served stat tracking \ref ScheduleResult_t
+// \return true if function ran successful else false for an error
+// There is no guarantee that the passed dyn_array_t will be the result of your implementation of load_process_control_blocks
 bool first_come_first_serve(dyn_array_t *ready_queue, ScheduleResult_t *result) 
 {
 	if (ready_queue == NULL || result == NULL) return false;
@@ -84,7 +87,7 @@ bool shortest_job_first(dyn_array_t *ready_queue, ScheduleResult_t *result)
     unsigned long total_run_time = 0;
 
 	// bool ptr to keep track of the processes that complete
-	bool *done = (bool*)malloc(sizeof(processes));
+	bool *done = (bool*)malloc(processes * sizeof(bool));;
 	if (done == NULL) return false;
 	for (size_t i = 0; i < processes; i++) {
 		*(done + i) = false; // initially false
@@ -138,6 +141,7 @@ bool shortest_job_first(dyn_array_t *ready_queue, ScheduleResult_t *result)
 	result->average_turnaround_time = total_turnaround_time / processes;
 	result->total_run_time = total_run_time;
 
+    free(done);
 	return true;
 }
 
@@ -266,6 +270,28 @@ bool priority(dyn_array_t *ready_queue, ScheduleResult_t *result)
     return true;
 }
 
+// Is the comparator function for the round robin algo
+// \param ProcessControlBlock_t to be compared
+// \param ProcessControlBlock_t to be compared
+// return returns a int -1 , 1 , 0 for the qsort to order 
+static int rr_cmp(const void *a, const void *b)
+{
+    const ProcessControlBlock_t *pa = (const ProcessControlBlock_t *)a;
+    const ProcessControlBlock_t *pb = (const ProcessControlBlock_t *)b;
+
+    if (pa->arrival < pb->arrival) return -1; // compares arrival times
+    if (pa->arrival > pb->arrival) return  1;
+
+    return 0; // return 0 if same
+}
+
+
+// Runs the Round Robin Process Scheduling algorithm over the incoming ready_queue
+// \param ready queue a dyn_array of type ProcessControlBlock_t that contain be up to N elements
+// \param result used for round robin stat tracking \ref ScheduleResult_t
+// \param the quantum
+// \return true if function ran successful else false for an error
+// There is no guarantee that the passed dyn_array_t will be the result of your implementation of load_process_control_blocks
 bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quantum) 
 {
     if (!ready_queue || !result || quantum == 0) {
@@ -274,11 +300,17 @@ bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quan
 
     size_t num_processes = dyn_array_size(ready_queue);
     size_t original_count = num_processes;
+
     if (num_processes == 0) {
         result->average_waiting_time = 0.0f;
         result->average_turnaround_time = 0.0f;
         result->total_run_time = 0;
         return true;
+    }
+
+    // sorts array based on arrival time only 
+    if(!dyn_array_sort(ready_queue, rr_cmp)){
+        return false;
     }
 
     uint32_t *orig_burst = calloc(num_processes, sizeof(uint32_t));
@@ -308,32 +340,21 @@ bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quan
 
     while (!dyn_array_empty(ready_queue))
     {
-        // find the first process that has arrived
-        size_t front_idx = 0;
-        ProcessControlBlock_t *curr = NULL;
-        bool anyone_arrived = false;
-
-        // look for the first process with arrival <= clock
-        for (size_t i = 0; i < dyn_array_size(ready_queue); i++) {
-            ProcessControlBlock_t *pcb = (ProcessControlBlock_t *)dyn_array_at(ready_queue, i);
-            if (pcb && pcb->arrival <= clock) {
-                front_idx = i;
-                curr = pcb;
-                anyone_arrived = true;
-                break;
-            }
+        num_processes = dyn_array_size(ready_queue);
+        ProcessControlBlock_t *curr = (ProcessControlBlock_t *)dyn_array_at(ready_queue, 0);;
+        if(!curr){
+            free(orig_burst);
+            free(orig_arrival);
+            return false;
         }
+     //   bool anyone_arrived = false;
 
-        if (!anyone_arrived) {
-            // no process has arrived yet
+        if(curr->arrival > clock){
             clock++;
-            continue;
+            continue; // this will jump to the top of the while loop
         }
 
-        // we have a process to run
-        if (!curr->started) {
-            curr->started = true;
-        }
+        if(!curr->started) curr->started = true; // just sets the proccess to started if it hasn't
 
         // run for up to quantum time units or until it finishes
         size_t time_slice = quantum;
@@ -344,41 +365,69 @@ bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quan
             time_slice--;
         }
 
+        // this while loop finds the index that is between the last arrived proccess and the first proccess to have not arrived yet so we can reinsert in the correct place
+        size_t indx = 0;
+        while(indx < num_processes){
+            ProcessControlBlock_t *p = (ProcessControlBlock_t *)dyn_array_at(ready_queue, indx);
+            if(!p || p->arrival > clock) break;
+            indx++;
+        }
+
         // if process is not finished, it goes back to the end of the queue
         if (curr->remaining_burst_time > 0)
         {
+            uint32_t burst_tmp = orig_burst[0];
+            uint32_t arr_tmp   = orig_arrival[0];
+
             // remove from current position
             ProcessControlBlock_t temp;
-            if (!dyn_array_extract(ready_queue, front_idx, &temp)) {
+            if (!dyn_array_extract(ready_queue, 0, &temp)) {
                 free(orig_burst);
                 free(orig_arrival);
                 return false;
             }
-            // push to back
-            if (!dyn_array_push_back(ready_queue, &temp)) {
+
+            for (size_t j = 0; j + 1 < num_processes; j++) {
+                orig_burst[j]   = orig_burst[j + 1];
+                orig_arrival[j] = orig_arrival[j + 1];
+            }
+            
+            size_t insertIndx = (indx > 0) ? (indx - 1): 0;
+
+            if(!dyn_array_insert(ready_queue, insertIndx, &temp)){
                 free(orig_burst);
                 free(orig_arrival);
                 return false;
             }
+
+            for (size_t j = num_processes - 1; j > insertIndx; j--) {
+                orig_burst[j] = orig_burst[j - 1];
+                orig_arrival[j] = orig_arrival[j - 1];
+            }
+            orig_burst[insertIndx] = burst_tmp;
+            orig_arrival[insertIndx] = arr_tmp;
+
+
         }
         else
         {
-            uint32_t turnaround = (uint32_t)(clock - orig_arrival[front_idx]);
-            uint32_t wait_time  = turnaround - orig_burst[front_idx];
+            // indexes are 0 becuase it was sorted at the begining from arrival time and burst time so after sorting all proccess that finish  should be at the first index
+            uint32_t turnaround = (uint32_t)(clock - orig_arrival[0]); 
+            uint32_t wait_time  = turnaround - orig_burst[0];
 
             total_turnaround += (float)turnaround;
             total_wait += (float)wait_time;
 
-            if (!dyn_array_erase(ready_queue, front_idx)) {
+            if (!dyn_array_erase(ready_queue, 0)) {
                 free(orig_burst);
                 free(orig_arrival);
                 return false;
             }
-            for (size_t j = front_idx; j < num_processes; j++) {
+            for (size_t j = 0; j + 1 < num_processes; j++) {
                 orig_burst[j] = orig_burst[j + 1];
                 orig_arrival[j] = orig_arrival[j + 1];
             }
-            num_processes--;
+           
         }
     }
 
@@ -392,6 +441,10 @@ bool round_robin(dyn_array_t *ready_queue, ScheduleResult_t *result, size_t quan
     return true;
 }
 
+// Reads the PCB values from the binary file into ProcessControlBlock_t
+// for N number of PCB entries stored in the file
+// \param input_file the file containing the PCB burst times
+// \return a populated dyn_array of ProcessControlBlocks if function ran successful else NULL for an error
 dyn_array_t *load_process_control_blocks(const char *input_file) 
 {
 	if (input_file == NULL) return NULL;
@@ -430,7 +483,7 @@ dyn_array_t *load_process_control_blocks(const char *input_file)
 		readBytes += (size_t)readIn; 
 
 		if(readBytes == 4){
-			switch(sectionNum)
+			switch(sectionNum) // determines where the data read should be stored
 			{
 				case 0:
 					burstTime = data;
@@ -449,7 +502,7 @@ dyn_array_t *load_process_control_blocks(const char *input_file)
 			totalRead ++;
 		}
 
-		if(sectionNum == 3){
+		if(sectionNum == 3){ // createspcb block if last data read in 
 			ProcessControlBlock_t pcb;
 			pcb.remaining_burst_time = burstTime;
 			pcb.priority = priority;
@@ -463,14 +516,9 @@ dyn_array_t *load_process_control_blocks(const char *input_file)
 
 	}
 
-	//ProcessControlBlock_t *pcb; // the file is containing PCBs
-
-	
-
 
 	close(fd);
-	// UNUSED(input_file);
-	// return NULL;
+
 	return dynamicArray;
 }
 

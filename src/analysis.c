@@ -26,6 +26,7 @@ int main(int argc, char **argv)
 
 
 	// get a dyn array from the pcb file using load proccess control blcok function
+	
 	dyn_array_t* pcb = load_process_control_blocks(argv[1]);
 	if(pcb == NULL) return EXIT_FAILURE;
 	 
@@ -37,7 +38,7 @@ int main(int argc, char **argv)
 	size_t quant = 0;
 	ScheduleResult_t result;
 
-	if((strncmp(algorithm , P, 1) && algorithmLen == 1) || (strncmp(algorithm, P, 1) && algorithmLen == 0)){
+	if((strncmp(algorithm , P, 1) == 0 && algorithmLen == 1)){
 		completed = priority(pcb, &result);
 	}else if(strncmp(algorithm, RR, 2) == 0 && algorithmLen == 2){
 		char extra;
@@ -51,20 +52,18 @@ int main(int argc, char **argv)
 		completed = first_come_first_serve(pcb, &result);
 	}else{
 		fprintf(stderr, "Unknown scheduling algorithm: %s\n", algorithm);
+		dyn_array_destroy(pcb);
     	return EXIT_FAILURE;
 	}
 	
-
-
-	//abort();		// REPLACE ME with implementation.
 
 	if(completed){
 		printf("Average waiting time: %.2f\n", result.average_waiting_time);
    	 	printf("Average turnaround time: %.2f\n", result.average_turnaround_time);
    	 	printf("Total run time: %lu\n", result.total_run_time);
-
+		dyn_array_destroy(pcb);
 		 return EXIT_SUCCESS;
 	}
-	
+	dyn_array_destroy(pcb);
 	return EXIT_FAILURE;
 }

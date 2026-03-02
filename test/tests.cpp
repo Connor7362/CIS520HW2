@@ -265,20 +265,46 @@ TEST(SJF, CorrectResultValues) {
     ProcessControlBlock_t p3 = { .remaining_burst_time = 8, .priority = 0, .arrival = 1, .started = false };
     ProcessControlBlock_t p4 = { .remaining_burst_time = 3, .priority = 0, .arrival = 0, .started = false };
     ProcessControlBlock_t p5 = { .remaining_burst_time = 4, .priority = 0, .arrival = 4, .started = false };
+
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p1));
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p2));
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p3));
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p4));
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p5));
+
+    ScheduleResult_t result = {};
+    bool success = shortest_job_first(test_queue, &result);
+    EXPECT_TRUE(success);
+
+    const float EPS = 0.001f;
+
+    EXPECT_NEAR(result.average_waiting_time, (0 + 1 + 4 + 7 + 14) / 5.0f, EPS);
+    EXPECT_NEAR(result.average_turnaround_time, (3 + 7 + 6 + 11 + 22) / 5.0f, EPS);
+    EXPECT_EQ(result.total_run_time, 23ul);
+
+    dyn_array_destroy(test_queue);
+}
+
 TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
     dyn_array_t* queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
     ASSERT_NE(queue, nullptr);
 
-    ASSERT_EQ(dyn_array_size(test_queue), 5u);
+    ProcessControlBlock_t p1 = { .remaining_burst_time = 6, .priority = 0, .arrival = 2, .started = false };
+    ProcessControlBlock_t p2 = { .remaining_burst_time = 2, .priority = 0, .arrival = 5, .started = false };
+    ProcessControlBlock_t p3 = { .remaining_burst_time = 8, .priority = 0, .arrival = 1, .started = false };
+    ProcessControlBlock_t p4 = { .remaining_burst_time = 3, .priority = 0, .arrival = 0, .started = false };
+    ProcessControlBlock_t p5 = { .remaining_burst_time = 4, .priority = 0, .arrival = 4, .started = false };
+    ASSERT_TRUE(dyn_array_push_back(queue, &p1));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p2));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p3));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p4));
+    ASSERT_TRUE(dyn_array_push_back(queue, &p5));
+
+    ASSERT_EQ(dyn_array_size(queue), 5u);
 
     ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
 
-    bool success = shortest_job_first(test_queue, &result);
+    bool success = shortest_job_first(queue, &result);
 
     ASSERT_TRUE(success);
 
@@ -286,9 +312,13 @@ TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
     EXPECT_EQ(result.average_turnaround_time,            (float)9.8);
     EXPECT_EQ(result.total_run_time,                     (unsigned long)23);
 
-    dyn_array_destroy(test_queue);
+    dyn_array_destroy(queue);
 }
+
+TEST(PriorityTest, SameArrival) {
     // lower number = higher priority
+    dyn_array_t* queue = dyn_array_create(3, sizeof(ProcessControlBlock_t), NULL);
+
     ProcessControlBlock_t p1 = { .remaining_burst_time = 8, .priority = 5, .arrival = 0, .started = false };
     ProcessControlBlock_t p2 = { .remaining_burst_time = 2, .priority = 2, .arrival = 0, .started = false }; // highest priority
     ProcessControlBlock_t p3 = { .remaining_burst_time = 6, .priority = 4, .arrival = 0, .started = false };
@@ -303,15 +333,9 @@ TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
 
     EXPECT_TRUE(success) << "priority() should succeed";
 
-    // Execution order should be: p2 (pri=2) → p3 (pri=4) → p1 (pri=5)
-    // Times:
-    // p2: wait=0, turnaround=2
-    // p3: wait=2, turnaround=2+6=8
-    // p1: wait=8, turnaround=8+8=16
-
     const float EPS = 0.001f;
-    EXPECT_NEAR(result.average_waiting_time, (0 + 2 + 8) / 3.0f, EPS);   // 20/3 = 3.333...
-    EXPECT_NEAR(result.average_turnaround_time, (2 + 8 + 16) / 3.0f, EPS);  // 26/3 = 8.666...
+    EXPECT_NEAR(result.average_waiting_time, (0 + 2 + 8) / 3.0f, EPS);   
+    EXPECT_NEAR(result.average_turnaround_time, (2 + 8 + 16) / 3.0f, EPS);  
     EXPECT_EQ(result.total_run_time, 16ul);
 
     dyn_array_destroy(queue);
@@ -362,29 +386,14 @@ TEST(RoundRobinTest, SameArrivals) {
     bool success = round_robin(queue, &result, quantum);
     EXPECT_TRUE(success) << "round_robin should succeed";
 
-    // Expected execution (quantum=4):
-    // t=0-4:  p1 (rem 6) → back to queue
-    // t=4-8:  p2 (rem 1) → back to queue
-    // t=8-12: p3 (rem 4) → back to queue
-    // t=12-16: p1 (rem 2) → back
-    // t=16-17: p2 (rem 0) → finishes
-    // t=17-21: p3 (rem 0) → finishes
-    // t=21-23: p1 (rem 0) → finishes
-
-    // Completion times: p2=17, p3=21, p1=23
-    // Turnaround: p2=17-0=17, p3=21-0=21, p1=23-0=23
-    // Wait times: TAT - burst
-    // p1: 23-10 = 13
-    // p2: 17-5  = 12
-    // p3: 21-8  = 13
-
     const float EPS = 0.001f;
-    EXPECT_NEAR(result.average_waiting_time, (13 + 12 + 13) / 3.0f, EPS);     // 38/3 ≈ 12.6667
-    EXPECT_NEAR(result.average_turnaround_time, (23 + 17 + 21) / 3.0f, EPS);  // 61/3 ≈ 20.3333
+    EXPECT_NEAR(result.average_waiting_time, (13 + 12 + 13) / 3.0f, EPS);     // 38/3 = 12.6667
+    EXPECT_NEAR(result.average_turnaround_time, (23 + 17 + 21) / 3.0f, EPS);  // 61/3 = 20.3333
     EXPECT_EQ(result.total_run_time, 23ul);  // total CPU time = sum of bursts = 23
 
     dyn_array_destroy(queue);
 }
+
 
 TEST(RoundRobinTest, DifferentArrivals) {
     dyn_array_t* queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
@@ -404,29 +413,9 @@ TEST(RoundRobinTest, DifferentArrivals) {
     bool success = round_robin(queue, &result, quantum);
     EXPECT_TRUE(success);
 
-    // Expected schedule (quantum=3):
-    // t=0-3: p1 (rem 5)
-    // t=3-6: p1 (rem 2)   ← p2 not arrived yet
-    // t=6-8: p1 (rem 0)   ← finishes p1
-    // t=8-11: p2 (rem 1)  ← p2 arrived at 2, but waited until p1 finished
-    // t=11-12: p2 (rem 0) → finishes p2
-    // t=12-15: p3 (rem 6) ← p3 arrived at 4
-    // t=15-18: p3 (rem 3)
-    // t=18-21: p3 (rem 0) → finishes
-
-    // Completion times: p1=8, p2=12, p3=21
-    // Turnaround:
-    // p1: 8-0 = 8
-    // p2: 12-2 = 10
-    // p3: 21-4 = 17
-    // Wait = TAT - burst
-    // p1: 8-8 = 0
-    // p2: 10-4 = 6
-    // p3: 17-9 = 8
-
     const float EPS = 0.001f;
-    EXPECT_NEAR(result.average_waiting_time, (0 + 6 + 8) / 3.0f, EPS);     // 14/3 ≈ 4.6667
-    EXPECT_NEAR(result.average_turnaround_time, (8 + 10 + 17) / 3.0f, EPS); // 35/3 ≈ 11.6667
+    EXPECT_NEAR(result.average_waiting_time, (7 + 7 + 8) / 3.0f, EPS);     // 14/3 = 4.6667
+    EXPECT_NEAR(result.average_turnaround_time, (15 + 11 + 17) / 3.0f, EPS); // 35/3 = 11.6667
     EXPECT_EQ(result.total_run_time, 21ul);  // 8+4+9 = 21
 
     dyn_array_destroy(queue);
