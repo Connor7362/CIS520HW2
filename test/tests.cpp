@@ -248,7 +248,7 @@ TEST(SRTF, CorrectResultValues){
 
 TEST(SJF, CheckEmptyQueue) {
     dyn_array_t *test_queue = dyn_array_create(0, sizeof(ProcessControlBlock_t), NULL);
-	ScheduleResult_t* result{};
+	ScheduleResult_t *result{};
 	bool success = shortest_job_first(test_queue, result);
 
 	EXPECT_FALSE(success);
@@ -270,13 +270,11 @@ TEST(SJF, CorrectResultValues) {
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p3));
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p4));
     ASSERT_TRUE(dyn_array_push_back(test_queue, &p5));
-TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
-    dyn_array_t* queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
-    ASSERT_NE(queue, nullptr);
 
     ASSERT_EQ(dyn_array_size(test_queue), 5u);
 
     ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
+
 
     bool success = shortest_job_first(test_queue, &result);
 
@@ -288,6 +286,13 @@ TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
 
     dyn_array_destroy(test_queue);
 }
+
+TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
+    dyn_array_t* queue = dyn_array_create(8, sizeof(ProcessControlBlock_t), NULL);
+    ASSERT_NE(queue, nullptr);
+
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
+
     // lower number = higher priority
     ProcessControlBlock_t p1 = { .remaining_burst_time = 8, .priority = 5, .arrival = 0, .started = false };
     ProcessControlBlock_t p2 = { .remaining_burst_time = 2, .priority = 2, .arrival = 0, .started = false }; // highest priority
@@ -298,7 +303,6 @@ TEST(PriorityTest, HigherPriorityRunsFirstSameArrival) {
     ASSERT_TRUE(dyn_array_push_back(queue, &p3));
     ASSERT_EQ(dyn_array_size(queue), 3u);
 
-    ScheduleResult_t result = {};
     bool success = priority(queue, &result);
 
     EXPECT_TRUE(success) << "priority() should succeed";
@@ -332,7 +336,7 @@ TEST(PriorityTest, DifferentArrivalTimesAndPriorities) {
     ASSERT_TRUE(dyn_array_push_back(queue, &p4));
     ASSERT_EQ(dyn_array_size(queue), 4u);
 
-    ScheduleResult_t result = {};
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
     bool success = priority(queue, &result);
     EXPECT_TRUE(success) << "priority() should succeed";
 
@@ -357,7 +361,7 @@ TEST(RoundRobinTest, SameArrivals) {
     ASSERT_TRUE(dyn_array_push_back(queue, &p3));
     ASSERT_EQ(dyn_array_size(queue), 3u);
 
-    ScheduleResult_t result = {};
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
     size_t quantum = 4;
     bool success = round_robin(queue, &result, quantum);
     EXPECT_TRUE(success) << "round_robin should succeed";
@@ -399,7 +403,7 @@ TEST(RoundRobinTest, DifferentArrivals) {
     ASSERT_TRUE(dyn_array_push_back(queue, &p3));
     ASSERT_EQ(dyn_array_size(queue), 3u);
 
-    ScheduleResult_t result = {};
+    ScheduleResult_t result = { .average_waiting_time = 0.0f, .average_turnaround_time = 0.0f, .total_run_time = 0UL };
     size_t quantum = 3;
     bool success = round_robin(queue, &result, quantum);
     EXPECT_TRUE(success);
